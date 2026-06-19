@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="src/NetflixSkipIntroMensageria.API/NetflixSkipIntroMensageria.API.csproj" />
+  <Project Path="src/NetflixSkipIntroMensageria.Catalog/NetflixSkipIntroMensageria.Catalog.csproj" />
+  <Project Path="src/NetflixSkipIntroMensageria.Infrastructure/NetflixSkipIntroMensageria.Infrastructure.csproj" />
+  <Project Path="src/NetflixSkipIntroMensageria.SharedKernel/NetflixSkipIntroMensageria.SharedKernel.csproj" />
+  <Project Path="src/NetflixSkipIntroMensageria.Streaming/NetflixSkipIntroMensageria.Streaming.csproj" />
+</Solution>
