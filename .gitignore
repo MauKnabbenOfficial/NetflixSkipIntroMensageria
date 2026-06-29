@@ -48,6 +48,15 @@ CodeCoverage/
 # MSBuild Binary and Structured Log
 *.binlog
 
+# Arquivos de vídeo — não versionar binários grandes no repositório
+*.mp4
+*.avi
+*.mkv
+*.mov
+
+# Output de build local
+build-output.txt
+
 # MSTest test Results
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*

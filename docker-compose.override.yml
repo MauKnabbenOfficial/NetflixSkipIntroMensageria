@@ -1,0 +1,22 @@
+# docker-compose.override.yml — sobrescreve o base APENAS para desenvolvimento local.
+# O Docker Compose aplica este arquivo automaticamente quando ambos existem na mesma pasta.
+# O Visual Studio usa este arquivo quando "docker-compose" é o startup project.
+
+services:
+
+  netflix-api:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_HTTP_PORTS: "8080"
+      Kafka__BootstrapServers: kafka:29092
+
+      # Necessário para o debugger do VS se conectar ao container
+      DOTNET_USE_POLLING_FILE_WATCHER: "1"
+
+    # Volumes para hot-reload de user secrets e certificados HTTPS do VS
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/home/app/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/home/app/.aspnet/https:ro
+
+  # Em desenvolvimento, Kafka e Zookeeper rodam normalmente —
+  # sem alterações em relação ao base.

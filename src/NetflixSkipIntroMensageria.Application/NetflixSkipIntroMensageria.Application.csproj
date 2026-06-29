@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Application conhece as interfaces dos repositórios (definidas em Catalog e Infrastructure),
+         mas NÃO conhece as implementações (SQL, InMemory etc.) — isso fica em Infrastructure. -->
+    <ProjectReference Include="..\NetflixSkipIntroMensageria.Catalog\NetflixSkipIntroMensageria.Catalog.csproj" />
+    <ProjectReference Include="..\NetflixSkipIntroMensageria.SharedKernel\NetflixSkipIntroMensageria.SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>

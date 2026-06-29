@@ -1,0 +1,97 @@
+# docker-compose.yml — definição BASE dos serviços (produção / CI)
+# Para rodar localmente: docker compose up
+# Para debug no Visual Studio: use docker-compose.override.yml (aplicado automaticamente)
+
+services:
+
+  # ── Zookeeper ─────────────────────────────────────────────────────────────
+  # Coordenação de cluster do Kafka. Obrigatório para Kafka < 4.0 (KRaft é alternativa).
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - netflix-net
+
+  # ── Kafka ──────────────────────────────────────────────────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      # 9092 → acesso da máquina host (aplicação rodando fora do Docker)
+      # 29092 → acesso interno entre containers
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - netflix-net
+
+  # ── Kafka UI ───────────────────────────────────────────────────────────────
+  # Interface web para inspecionar tópicos, mensagens e consumer groups.
+  # Acesse: http://localhost:8090
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    networks:
+      - netflix-net
+
+  # ── SQL Server ─────────────────────────────────────────────────────────────
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlserver
+    ports:
+      - "1433:1433"
+    environment:
+      SA_PASSWORD: "Netflix@123!"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"   # licença gratuita para desenvolvimento
+    volumes:
+      - sqlserver-data:/var/opt/mssql  # dados persistidos entre restarts
+    networks:
+      - netflix-net
+
+  # ── API ────────────────────────────────────────────────────────────────────
+  # O contexto de build é a raiz da solution (não a pasta do projeto),
+  # porque o Dockerfile precisa copiar todos os projetos referenciados.
+  netflix-api:
+    build:
+      context: .
+      dockerfile: src/NetflixSkipIntroMensageria.API/Dockerfile
+    container_name: netflix-api
+    depends_on:
+      - kafka
+      - sqlserver
+    ports:
+      - "5000:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Kafka__BootstrapServers: kafka:29092
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=NetflixSkipIntro;User Id=sa;Password=Netflix@123!;TrustServerCertificate=True"
+    networks:
+      - netflix-net
+
+networks:
+  netflix-net:
+    driver: bridge
+
+volumes:
+  sqlserver-data:

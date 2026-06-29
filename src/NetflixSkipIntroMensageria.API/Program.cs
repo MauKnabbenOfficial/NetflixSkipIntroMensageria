@@ -1,67 +1,49 @@
-//using NetflixSkipIntroMensageria.Infrastructure.Messaging;
-//using NetflixSkipIntroMensageria.Streaming.Messaging;
+// ──────────────────────────────────────────────────────────────────────────────
+// Program.cs — bootstrap da aplicação
+// Responsabilidade única: registrar serviços e configurar o pipeline HTTP.
+// Nenhuma lógica de negócio aqui — isso vai nos Controllers e Services.
+// ──────────────────────────────────────────────────────────────────────────────
 
-//var builder = WebApplication.CreateBuilder(args);
-
-//// Add services to the container.
-//// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-//builder.Services.AddOpenApi();
-
-//var app = builder.Build();
-
-//// Configure the HTTP request pipeline.
-//if (app.Environment.IsDevelopment())
-//{
-//    app.MapOpenApi();
-//}
-
-//app.UseHttpsRedirection();
-
-//var summaries = new[]
-//{
-//    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-//};
-
-//app.MapGet("/weatherforecast", () =>
-//{
-//    var forecast =  Enumerable.Range(1, 5).Select(index =>
-//        new WeatherForecast
-//        (
-//            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-//            Random.Shared.Next(-20, 55),
-//            summaries[Random.Shared.Next(summaries.Length)]
-//        ))
-//        .ToArray();
-//    return forecast;
-//})
-//.WithName("GetWeatherForecast");
-
-//app.Run();
-
-//record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-//{
-//    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-//}
-
-
-//--------------------------------------------------------------------------------------------------------------------//
-//--------------------------------------------------------------------------------------------------------------------//
-//--------------------------------------------------------------------------------------------------------------------//
-
+using Microsoft.EntityFrameworkCore;
+using NetflixSkipIntroMensageria.Application.Services;
+using NetflixSkipIntroMensageria.Catalog.Repositories;
+using NetflixSkipIntroMensageria.Infrastructure.Data;
 using NetflixSkipIntroMensageria.Infrastructure.Messaging;
+using NetflixSkipIntroMensageria.Infrastructure.Repositories;
+using NetflixSkipIntroMensageria.SharedKernel.Repositories;
 using NetflixSkipIntroMensageria.Streaming.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var kafka = "localhost:9092";
+// ── Banco de dados ────────────────────────────────────────────────────────────
+builder.Services.AddDbContext<NetflixDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Producer disponível para injeção nos controllers
+// ── Repositórios (SQL Server) ─────────────────────────────────────────────────
+// Troca de InMemory para SQL: só esta seção muda. Controllers e Services
+// continuam inalterados — eles conhecem apenas as interfaces.
+builder.Services.AddScoped<ICatalogRepository, SqlCatalogRepository>();
+builder.Services.AddScoped<IPlaybackStateRepository, SqlPlaybackStateRepository>();
+
+// ── Services (Application layer) ─────────────────────────────────────────────
+builder.Services.AddScoped<IEpisodeService, EpisodeService>();
+builder.Services.AddScoped<ICatalogService, CatalogService>();
+
+// ── Mensageria (Kafka) ────────────────────────────────────────────────────────
+var kafka = builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+
 builder.Services.AddSingleton(_ => new EpisodeProducer(kafka));
 
-// Consumer rodando em background
-builder.Services.AddSingleton(_ => new EpisodeConsumer(kafka));
+// EpisodeConsumer recebe IServiceScopeFactory (Singleton) em vez dos repositórios (Scoped).
+// Cria um scope por mensagem internamente — padrão correto para BackgroundService + EF Core.
+builder.Services.AddSingleton(sp => new EpisodeConsumer(
+    kafka,
+    sp.GetRequiredService<IServiceScopeFactory>()
+));
 builder.Services.AddHostedService<EpisodeConsumerService>();
 
+// ── HTTP ──────────────────────────────────────────────────────────────────────
+builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
@@ -71,20 +53,12 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Endpoint que simula o player sinalizando fim de episódio
-app.MapPost("/episodes/{episodeId}/completed", async (int episodeId, EpisodeProducer producer) =>
-{
-    var evento = new NetflixSkipIntroMensageria.SharedKernel.Events.EpisodeCompletedEvent(
-        UserId: Guid.NewGuid(),       // depois vira autenticação real
-        EpisodeId: episodeId,
-        NextEpisodeId: episodeId + 1,
-        SeriesId: 1,
-        Season: 1,
-        CompletedAt: DateTime.UtcNow
-    );
+// Serve arquivos estáticos de wwwroot/ — simula o CDN/storage na ausência do S3/Azure Blob.
+// O vídeo em wwwroot/videos/episode.mp4 fica acessível em GET /videos/episode.mp4.
+// Em produção este middleware não existiria: a API retornaria uma pre-signed URL
+// e o player buscaria o vídeo diretamente no storage.
+app.UseStaticFiles();
 
-    await producer.PublishEpisodeCompletedAsync(evento);
-    return Results.Accepted();
-});
+app.MapControllers();
 
 app.Run();

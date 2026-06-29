@@ -13,6 +13,8 @@
   <ItemGroup>
     <ProjectReference Include="..\NetflixSkipIntroMensageria.Infrastructure\NetflixSkipIntroMensageria.Infrastructure.csproj" />
     <ProjectReference Include="..\NetflixSkipIntroMensageria.Streaming\NetflixSkipIntroMensageria.Streaming.csproj" />
+    <ProjectReference Include="..\NetflixSkipIntroMensageria.Catalog\NetflixSkipIntroMensageria.Catalog.csproj" />
+    <ProjectReference Include="..\NetflixSkipIntroMensageria.Application\NetflixSkipIntroMensageria.Application.csproj" />
   </ItemGroup>
 
 </Project>

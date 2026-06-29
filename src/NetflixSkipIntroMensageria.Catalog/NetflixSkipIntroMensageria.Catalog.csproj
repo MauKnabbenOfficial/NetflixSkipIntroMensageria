@@ -6,4 +6,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!-- Catalog é independente: sem referências externas. Entidades e repositórios próprios. -->
+
 </Project>

@@ -1,6 +1,42 @@
-@NetflixSkipIntroMensageria.API_HostAddress = http://localhost:5091
+# @baseUrl = http://localhost:5000
+@baseUrl = http://localhost:58603
 
-GET {{NetflixSkipIntroMensageria.API_HostAddress}}/weatherforecast/
-Accept: application/json
+
+### ─────────────────────────────────────────────────────────
+### PASSO 1 — Verificar catálogo (episódios no banco)
+### ─────────────────────────────────────────────────────────
+GET {{baseUrl}}/catalog/episodes
 
 ###
+
+### ─────────────────────────────────────────────────────────
+### PASSO 2 — Sinalizar que o usuário terminou o episódio 1
+### O Consumer processa o evento Kafka e salva PlaybackState
+### Copie o "userId" da resposta para usar no PASSO 3
+### ─────────────────────────────────────────────────────────
+POST {{baseUrl}}/episodes/1/completed
+
+###
+
+### ─────────────────────────────────────────────────────────
+### PASSO 3 — Consultar onde o player deve iniciar o ep 2
+### Substitua o userId pelo valor retornado no PASSO 2
+### Aguarde ~1s após o PASSO 2 antes de rodar este
+### Esperado: startAtSeconds=70, source="pre-computed"
+### ─────────────────────────────────────────────────────────
+GET {{baseUrl}}/episodes/2/playback-state?userId=77c782ea-b547-47fb-929c-8f63e5b8d1c4
+
+###
+
+### ─────────────────────────────────────────────────────────
+### PASSO 4 — Acesso direto (sem ter vindo do ep anterior)
+### Esperado: startAtSeconds=0, source="catalog-default"
+### ─────────────────────────────────────────────────────────
+GET {{baseUrl}}/episodes/3/playback-state?userId=00000000-0000-0000-0000-000000000000
+
+###
+
+### ─────────────────────────────────────────────────────────
+### EXTRA — Acessar o vídeo diretamente (simula CDN)
+### ─────────────────────────────────────────────────────────
+GET {{baseUrl}}/videos/episode.mp4
