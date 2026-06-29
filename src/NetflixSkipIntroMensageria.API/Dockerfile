@@ -8,6 +8,7 @@ WORKDIR /src
 # Copia todos os .csproj primeiro — camada cacheável pelo Docker.
 # Se só o código mudar (não os pacotes), esta camada é reutilizada.
 COPY src/NetflixSkipIntroMensageria.API/NetflixSkipIntroMensageria.API.csproj                         src/NetflixSkipIntroMensageria.API/
+COPY src/NetflixSkipIntroMensageria.Application/NetflixSkipIntroMensageria.Application.csproj         src/NetflixSkipIntroMensageria.Application/
 COPY src/NetflixSkipIntroMensageria.Catalog/NetflixSkipIntroMensageria.Catalog.csproj                 src/NetflixSkipIntroMensageria.Catalog/
 COPY src/NetflixSkipIntroMensageria.Infrastructure/NetflixSkipIntroMensageria.Infrastructure.csproj   src/NetflixSkipIntroMensageria.Infrastructure/
 COPY src/NetflixSkipIntroMensageria.SharedKernel/NetflixSkipIntroMensageria.SharedKernel.csproj       src/NetflixSkipIntroMensageria.SharedKernel/

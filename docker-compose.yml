@@ -69,6 +69,28 @@ services:
     networks:
       - netflix-net
 
+  # ── Frontend Vue3 ─────────────────────────────────────────────────────────
+  # Servidor web nginx que serve o bundle Vue e faz proxy reverso para a API.
+  # Acesse: http://localhost:3000
+  #
+  # Arquitetura de comunicação:
+  #   Browser → nginx (porta 3000)
+  #   Browser → nginx /api/* → proxy → netflix-api:8080 (rede interna Docker)
+  #   Browser → nginx /videos/* → proxy → netflix-api:8080/videos/ (static files)
+  #
+  # O browser nunca fala diretamente com a API, eliminando a necessidade de CORS.
+  netflix-web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: netflix-web
+    depends_on:
+      - netflix-api
+    ports:
+      - "3000:80"
+    networks:
+      - netflix-net
+
   # ── API ────────────────────────────────────────────────────────────────────
   # O contexto de build é a raiz da solution (não a pasta do projeto),
   # porque o Dockerfile precisa copiar todos os projetos referenciados.

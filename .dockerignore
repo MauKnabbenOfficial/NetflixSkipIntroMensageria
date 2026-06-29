@@ -1,0 +1,24 @@
+# Exclui artefatos de build gerados localmente pelo Visual Studio/MSBuild.
+# Se os obj/ forem copiados, o project.assets.json dentro deles contém
+# caminhos Windows (C:\Program Files\...) que quebram o dotnet publish no Linux.
+**/bin/
+**/obj/
+
+# Pasta de desenvolvimento do VS
+.vs/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# Arquivos locais que não precisam entrar na imagem
+*.user
+*.suo
+*.md
+build.bat
+build-output.txt
+docker-compose*.yml
+Scripts/
+web/

@@ -48,6 +48,9 @@ CodeCoverage/
 # MSBuild Binary and Structured Log
 *.binlog
 
+# Frontend — dependências locais
+web/node_modules/
+
 # Arquivos de vídeo — não versionar binários grandes no repositório
 *.mp4
 *.avi
