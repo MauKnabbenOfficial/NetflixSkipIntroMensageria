@@ -16,7 +16,7 @@ VALUES
     (2, 'O Começo',    1, 2, 0, 70, 'videos/GTAVI.mp4'),
     (3, 'A Virada',    1, 3, 0, 70, 'videos/GTAVI.mp4'),
     (4, 'O Confronto', 1, 4, 0, 70, 'videos/GTAVI.mp4'),
-    (5, 'Finale',      1, 5, 0,  0, 'videos/GTAVI.mp4');
+    (5, 'Finale',      1, 5, 0,  70, 'videos/GTAVI.mp4');
 GO
 
 PRINT '5 episódios inseridos.';

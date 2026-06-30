@@ -51,5 +51,6 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 app.UseCors();
+app.UseStaticFiles(); // serve wwwroot/ (inclui /videos/*.mp4)
 app.MapControllers();
 app.Run();
