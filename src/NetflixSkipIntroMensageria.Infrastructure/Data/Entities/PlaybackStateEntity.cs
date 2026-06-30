@@ -13,6 +13,12 @@ public class PlaybackStateEntity
     public int EpisodeId { get; set; }
     public int StartAtSeconds { get; set; }
     public required string VideoStorageKey { get; set; }
+
+    // ── Campos de integridade ─────────────────────────────────────────────
+    public Guid SessionId { get; set; }           // Âncora de sessão — ignora estados stale
+    public DateTime ExpiresAt { get; set; }        // TTL: CreatedAt + 2h
+    public bool IsConsumed { get; set; } = false;  // True após o player confirmar reprodução
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

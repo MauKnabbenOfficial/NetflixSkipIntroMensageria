@@ -1,8 +1,6 @@
-// ──────────────────────────────────────────────────────────────────────────────
-// Program.cs — bootstrap da aplicação
-// Responsabilidade única: registrar serviços e configurar o pipeline HTTP.
-// Nenhuma lógica de negócio aqui — isso vai nos Controllers e Services.
-// ──────────────────────────────────────────────────────────────────────────────
+// Program.cs -- bootstrap da aplicacao
+// Responsabilidade unica: registrar servicos e configurar o pipeline HTTP.
+// Nenhuma logica de negocio aqui -- isso vai nos Controllers e Services.
 
 using Microsoft.EntityFrameworkCore;
 using NetflixSkipIntroMensageria.Application.Services;
@@ -15,50 +13,43 @@ using NetflixSkipIntroMensageria.Streaming.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ── Banco de dados ────────────────────────────────────────────────────────────
+// -- Banco de dados -----------------------------------------------------------
 builder.Services.AddDbContext<NetflixDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// ── Repositórios (SQL Server) ─────────────────────────────────────────────────
-// Troca de InMemory para SQL: só esta seção muda. Controllers e Services
-// continuam inalterados — eles conhecem apenas as interfaces.
+// -- Repositorios (SQL Server) ------------------------------------------------
 builder.Services.AddScoped<ICatalogRepository, SqlCatalogRepository>();
 builder.Services.AddScoped<IPlaybackStateRepository, SqlPlaybackStateRepository>();
 
-// ── Services (Application layer) ─────────────────────────────────────────────
+// -- Services (Application layer) --------------------------------------------
 builder.Services.AddScoped<IEpisodeService, EpisodeService>();
 builder.Services.AddScoped<ICatalogService, CatalogService>();
 
-// ── Mensageria (Kafka) ────────────────────────────────────────────────────────
+// -- Mensageria (Kafka) -------------------------------------------------------
 var kafka = builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
 
+// Produtores: Singleton porque IProducer<> e thread-safe e caro de instanciar
 builder.Services.AddSingleton(_ => new EpisodeProducer(kafka));
+builder.Services.AddSingleton(_ => new PlaybackEventProducer(kafka));
 
-// EpisodeConsumer recebe IServiceScopeFactory (Singleton) em vez dos repositórios (Scoped).
-// Cria um scope por mensagem internamente — padrão correto para BackgroundService + EF Core.
-builder.Services.AddSingleton(sp => new EpisodeConsumer(
-    kafka,
-    sp.GetRequiredService<IServiceScopeFactory>()
-));
+// Consumers: Singleton com IServiceScopeFactory para resolver DbContext (Scoped) por mensagem
+builder.Services.AddSingleton(sp => new EpisodeConsumer(kafka, sp.GetRequiredService<IServiceScopeFactory>()));
+builder.Services.AddSingleton(sp => new PlaybackConsumer(kafka, sp.GetRequiredService<IServiceScopeFactory>()));
+
+// BackgroundServices que gerenciam o loop de cada consumer
 builder.Services.AddHostedService<EpisodeConsumerService>();
+builder.Services.AddHostedService<PlaybackConsumerService>();
 
-// ── HTTP ──────────────────────────────────────────────────────────────────────
+// -- API ----------------------------------------------------------------------
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddCors(options =>
+    options.AddDefaultPolicy(policy =>
+        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()));
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-    app.MapOpenApi();
-
-app.UseHttpsRedirection();
-
-// Serve arquivos estáticos de wwwroot/ — simula o CDN/storage na ausência do S3/Azure Blob.
-// O vídeo em wwwroot/videos/episode.mp4 fica acessível em GET /videos/episode.mp4.
-// Em produção este middleware não existiria: a API retornaria uma pre-signed URL
-// e o player buscaria o vídeo diretamente no storage.
-app.UseStaticFiles();
-
+app.UseCors();
 app.MapControllers();
-
 app.Run();

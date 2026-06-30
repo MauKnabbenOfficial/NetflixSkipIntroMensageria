@@ -10,6 +10,7 @@ public class NetflixDbContext : DbContext
 
     public DbSet<Episode> Episodes => Set<Episode>();
     public DbSet<PlaybackStateEntity> PlaybackStates => Set<PlaybackStateEntity>();
+    public DbSet<WatchProgressEntity> WatchProgress => Set<WatchProgressEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -18,7 +19,7 @@ public class NetflixDbContext : DbContext
         {
             e.ToTable("Episodes");
             e.HasKey(x => x.Id);
-            e.Property(x => x.Id).ValueGeneratedNever(); // Id vem do domínio, não auto-increment
+            e.Property(x => x.Id).ValueGeneratedNever();
             e.Property(x => x.Title).IsRequired().HasMaxLength(200);
             e.Property(x => x.VideoStorageKey).IsRequired().HasMaxLength(500);
         });
@@ -31,8 +32,19 @@ public class NetflixDbContext : DbContext
             e.Property(x => x.Id).ValueGeneratedOnAdd();
             e.Property(x => x.VideoStorageKey).IsRequired().HasMaxLength(500);
 
-            // Índice único (UserId, EpisodeId): garante idempotência — o mesmo evento
-            // processado duas vezes não gera dois registros, só sobrescreve.
+            // Índice único (UserId, EpisodeId): upsert sobrescreve o estado anterior.
+            // Quando uma nova sessão gera um estado para o mesmo episódio, o antigo é substituído.
+            e.HasIndex(x => new { x.UserId, x.EpisodeId }).IsUnique();
+        });
+
+        // ── WatchProgress ─────────────────────────────────────────────────────
+        modelBuilder.Entity<WatchProgressEntity>(e =>
+        {
+            e.ToTable("WatchProgress");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+
+            // Índice único (UserId, EpisodeId): upsert mantém apenas o progresso mais recente.
             e.HasIndex(x => new { x.UserId, x.EpisodeId }).IsUnique();
         });
 

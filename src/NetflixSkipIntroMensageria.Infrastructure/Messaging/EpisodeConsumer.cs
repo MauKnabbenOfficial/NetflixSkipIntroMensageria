@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 using NetflixSkipIntroMensageria.Catalog.Repositories;
@@ -14,9 +14,9 @@ public class EpisodeConsumer
     private readonly IConsumer<string, string> _consumer;
     private readonly IServiceScopeFactory _scopeFactory;
 
-    // IServiceScopeFactory é Singleton por natureza — seguro injetar em Singleton.
+    // IServiceScopeFactory e Singleton por natureza -- seguro injetar em Singleton.
     // Criamos um scope por mensagem para resolver DbContext (Scoped) corretamente.
-    // Padrão obrigatório para BackgroundService + EF Core.
+    // Padrao obrigatorio para BackgroundService + EF Core.
     public EpisodeConsumer(string bootstrapServers, IServiceScopeFactory scopeFactory)
     {
         _scopeFactory = scopeFactory;
@@ -24,8 +24,8 @@ public class EpisodeConsumer
         var config = new ConsumerConfig
         {
             BootstrapServers = bootstrapServers,
-            GroupId = "skip-intro-group",
-            AutoOffsetReset = AutoOffsetReset.Earliest,
+            GroupId          = "skip-intro-group",
+            AutoOffsetReset  = AutoOffsetReset.Latest,   // Apenas eventos novos -- evita reprocessar stale
             EnableAutoCommit = false
         };
 
@@ -35,7 +35,7 @@ public class EpisodeConsumer
     public void Start(CancellationToken ct)
     {
         _consumer.Subscribe(Topic);
-        Console.WriteLine($"[Consumer] Inscrito no tópico '{Topic}'. Aguardando eventos...");
+        Console.WriteLine($"[EpisodeConsumer] Inscrito no topico '{Topic}'. Aguardando eventos...");
 
         try
         {
@@ -43,66 +43,53 @@ public class EpisodeConsumer
             {
                 try
                 {
-                    var msg = _consumer.Consume(ct);
+                    var msg    = _consumer.Consume(ct);
                     var evento = JsonSerializer.Deserialize<EpisodeCompletedEvent>(msg.Message.Value);
 
-                    if (evento is null) continue;
+                    if (evento is not null)
+                        ProcessEvent(evento);
 
-                    ProcessarEventoAsync(evento).GetAwaiter().GetResult();
-                    _consumer.Commit(msg); // commit manual: só confirma após processar com sucesso
+                    _consumer.Commit(msg);
                 }
-                catch (ConsumeException ex) when (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
+                catch (ConsumeException ex) when (!ct.IsCancellationRequested)
                 {
-                    // Tópico ainda não existe — o Producer o cria na primeira mensagem.
-                    // Aguarda e tenta novamente em vez de crashar a aplicação.
-                    Console.WriteLine($"[Consumer] Tópico '{Topic}' ainda não existe. Aguardando 3s...");
-                    Thread.Sleep(3000);
-                }
-                catch (ConsumeException ex)
-                {
-                    // Outros erros de consumo: loga e continua (não derruba a app).
-                    Console.WriteLine($"[Consumer] Erro ao consumir mensagem: {ex.Error.Reason}");
+                    Console.WriteLine($"[EpisodeConsumer] Erro de consumo: {ex.Error.Reason}");
                 }
             }
         }
-        catch (OperationCanceledException) { }
-        finally
-        {
-            _consumer.Close();
-        }
+        catch (OperationCanceledException) { /* shutdown normal */ }
+        finally { _consumer.Close(); }
     }
 
-    private async Task ProcessarEventoAsync(EpisodeCompletedEvent evento)
+    private void ProcessEvent(EpisodeCompletedEvent evento)
     {
-        // Scope criado por mensagem: DbContext vive só durante o processamento desta mensagem
-        // e é descartado ao final — sem vazamento de conexão nem estado compartilhado.
-        using var scope = _scopeFactory.CreateScope();
-        var catalog = scope.ServiceProvider.GetRequiredService<ICatalogRepository>();
-        var playbackState = scope.ServiceProvider.GetRequiredService<IPlaybackStateRepository>();
+        using var scope   = _scopeFactory.CreateScope();
+        var catalogRepo   = scope.ServiceProvider.GetRequiredService<ICatalogRepository>();
+        var playbackRepo  = scope.ServiceProvider.GetRequiredService<IPlaybackStateRepository>();
 
-        var proximoEpisodio = catalog.GetById(evento.NextEpisodeId);
-
-        if (proximoEpisodio is null)
+        var nextEpisode = catalogRepo.GetById(evento.NextEpisodeId);
+        if (nextEpisode is null)
         {
-            Console.WriteLine($"[Consumer] Ep {evento.NextEpisodeId} não encontrado no catálogo — pode ser o último da série.");
+            Console.WriteLine($"[EpisodeConsumer] Episodio seguinte {evento.NextEpisodeId} nao encontrado no catalogo.");
             return;
         }
 
-        var startAt = proximoEpisodio.IntroEndSeconds;
+        // Onde o proximo episodio deve comecar: logo apos a intro
+        var startAt = nextEpisode.IntroEndSeconds;
 
         var state = new PlaybackState(
-            UserId: evento.UserId,
-            EpisodeId: proximoEpisodio.Id,
-            StartAtSeconds: startAt,
-            VideoStorageKey: proximoEpisodio.VideoStorageKey
+            UserId:          evento.UserId,
+            EpisodeId:       evento.NextEpisodeId,
+            StartAtSeconds:  startAt,
+            VideoStorageKey: nextEpisode.VideoStorageKey,
+            SessionId:       evento.SessionId,          // Ancora de sessao
+            ExpiresAt:       DateTime.UtcNow.AddHours(2) // TTL de 2h
         );
 
-        await playbackState.SaveAsync(state);
+        playbackRepo.SaveAsync(state).GetAwaiter().GetResult();
 
-        Console.WriteLine(
-            $"[Consumer] Usuário {evento.UserId} terminou ep {evento.EpisodeId}. " +
-            $"Próximo: '{proximoEpisodio.Title}' (ep {proximoEpisodio.Id}) " +
-            $"→ iniciar em {startAt}s (intro: {proximoEpisodio.IntroStartSeconds}s–{proximoEpisodio.IntroEndSeconds}s). " +
-            $"Storage: {proximoEpisodio.VideoStorageKey}");
+        Console.WriteLine($"[EpisodeConsumer] PlaybackState salvo: episodio={evento.NextEpisodeId}, " +
+                          $"startAt={startAt}s, sessionId={evento.SessionId}, " +
+                          $"expiresAt={state.ExpiresAt:HH:mm:ss}");
     }
 }

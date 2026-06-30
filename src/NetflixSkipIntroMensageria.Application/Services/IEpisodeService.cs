@@ -5,9 +5,8 @@ namespace NetflixSkipIntroMensageria.Application.Services;
 public interface IEpisodeService
 {
     /// <summary>
-    /// Retorna onde o player deve iniciar a reprodução do episódio.
-    /// Consulta o estado pré-computado pelo Consumer (via Kafka) primeiro;
-    /// se não existir, retorna o default do catálogo (início do vídeo).
+    /// Retorna o estado de reprodução valido para a sessao atual.
+    /// Aplica as tres verificacoes de integridade: sessionId, TTL e isConsumed.
     /// </summary>
-    Task<PlaybackStateDto?> GetPlaybackStateAsync(Guid userId, int episodeId);
+    Task<PlaybackStateDto?> GetPlaybackStateAsync(Guid userId, int episodeId, Guid sessionId);
 }

@@ -7,13 +7,14 @@
 USE master;
 GO
 
-IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'NetflixSkipIntro')
+IF EXISTS (SELECT name FROM sys.databases WHERE name = 'NetflixSkipIntro')
 BEGIN
-    CREATE DATABASE NetflixSkipIntro;
-    PRINT 'Banco NetflixSkipIntro criado.';
+    ALTER DATABASE NetflixSkipIntro SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE NetflixSkipIntro;
+    PRINT 'Banco NetflixSkipIntro removido.';
 END
-ELSE
-BEGIN
-    PRINT 'Banco NetflixSkipIntro já existe — pulando criação.';
-END
+GO
+
+CREATE DATABASE NetflixSkipIntro;
+PRINT 'Banco NetflixSkipIntro criado.';
 GO

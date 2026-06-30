@@ -6,6 +6,7 @@ public record EpisodeCompletedEvent(
     int NextEpisodeId,
     int SeriesId,
     int Season,
-    DateTime CompletedAt
+    DateTime CompletedAt,
+    Guid SessionId          // Âncora de sessão — garante que estados stale de sessões anteriores sejam ignorados
 );
 
